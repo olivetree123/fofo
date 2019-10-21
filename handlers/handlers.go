@@ -55,7 +55,6 @@ func RegisterServiceHandler(cmd *entity.Command) (*entity.Service, error) {
 		Logger.Error(err)
 		return nil, err
 	}
-	Services[service.ID] = &service
 	return &service, nil
 }
 

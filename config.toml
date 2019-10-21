@@ -1,0 +1,7 @@
+
+RedisHost = "localhost"
+RedisPort = 6379
+RedisDB = 0
+
+MongoDBHost = "localhost"
+MongoDBPort = 27017

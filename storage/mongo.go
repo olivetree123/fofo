@@ -2,7 +2,9 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	. "fofo/common"
+	"fofo/config"
 	"fofo/entity"
 	"fofo/utils"
 	"go.mongodb.org/mongo-driver/bson"
@@ -18,8 +20,10 @@ var ctx context.Context
 
 func init() {
 	var err error
+	mongoAddr := fmt.Sprintf("mongodb://%s:%d", config.Config.GetString("MongoDBHost"), config.Config.GetInt("MongoDBPort"))
+	Logger.Info("mongoAddr = ", mongoAddr)
 	ctx, _ = context.WithTimeout(context.Background(), 5*time.Second)
-	MongoClient, err = mongo.Connect(ctx, options.Client().ApplyURI("mongodb://10.88.190.211:27017"))
+	MongoClient, err = mongo.Connect(ctx, options.Client().ApplyURI(mongoAddr))
 	if err != nil {
 		Logger.Error(err)
 		return

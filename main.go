@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	. "fofo/common"
+	"fofo/config"
 	"fofo/entity"
 	"fofo/handlers"
 	"github.com/go-redis/redis"
@@ -86,10 +88,12 @@ func healthCheck(client *redis.Client) {
 }
 
 func main() {
+	redisAddr := fmt.Sprintf("%s:%d", config.Config.GetString("RedisHost"), config.Config.GetInt("RedisPort"))
+	Logger.Info("redisAddr = ", redisAddr)
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
+		Addr:     redisAddr,
+		Password: "",                              // no password set
+		DB:       config.Config.GetInt("RedisDB"), // use default DB
 	})
 	_, err := redisClient.Ping().Result()
 	if err != nil {
