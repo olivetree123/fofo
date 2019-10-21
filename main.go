@@ -4,58 +4,85 @@ import (
 	"bytes"
 	"encoding/json"
 	. "fofo/common"
+	"fofo/entity"
+	"fofo/handlers"
 	"github.com/go-redis/redis"
-	"github.com/mitchellh/mapstructure"
+	"time"
 )
 
-const CommandHeartbeat int = 0
-const CommandRegisterService int = 100
+var IsTerminated = false
 
-// 命令
-type Command struct {
-	Code int
-	Args map[string]interface{}
-}
-
-type RegisterServiceParam struct {
-	Name    string
-	Group   string
-	Port    int
-	Address string
-	Extra   interface{}
-}
-
-func registerService(cmd Command) {
-	var param RegisterServiceParam
-	err := mapstructure.Decode(cmd.Args, &param)
-	if err != nil {
-		Logger.Error(err)
-		return
-	}
-
-}
-
-// 从 redis 队列中监听消息
-func subRedis(redisSubChannel <-chan *redis.Message, cmdChannel chan Command, signalChannel chan bool) {
+// response 发送返回结果
+func response(client *redis.Client, responseChannel chan *entity.Response) {
 	for {
-		msg, ok := <-redisSubChannel
-		if !ok {
-			Logger.Error("redis channel has been closed, break.")
-			break
+		resp := <-responseChannel
+		if resp == nil {
+			Logger.Info("response terminated")
+			return
 		}
-		Logger.Info(msg.Channel, msg.Payload)
-		buf := bytes.NewBufferString(msg.Payload)
-		var cmd Command
-		err := json.Unmarshal(buf.Bytes(), &cmd)
+		content, err := json.Marshal(resp.Content)
+		if err != nil {
+			Logger.Error(err)
+			continue
+		}
+		r := client.LPush(resp.RequestID, content)
+		err = r.Err()
+		if err != nil {
+			Logger.Error(err)
+			continue
+		}
+	}
+}
+
+// subRedis 从 redis 队列中监听消息
+func subRedis(client *redis.Client, signalChannel chan bool, responseChannel chan *entity.Response) {
+	for {
+		msg := client.BRPop(0, RequestQueue)
+		if msg.Err() != nil {
+			Logger.Error("redis channel has been closed, break.")
+			signalChannel <- true
+			return
+		}
+		res, err := msg.Result()
 		if err != nil {
 			Logger.Error(err)
 			signalChannel <- true
 			return
 		}
-		cmdChannel <- cmd
-		Logger.Info(cmd)
+		data := bytes.NewBufferString(res[1])
+		var cmd entity.Command
+		err = json.Unmarshal(data.Bytes(), &cmd)
+		if err != nil {
+			Logger.Error(err)
+			signalChannel <- true
+			return
+		}
+		err = handlers.CommandHandler(&cmd, responseChannel)
+		if err != nil {
+			Logger.Error(err)
+			signalChannel <- true
+			return
+		}
 	}
-	Logger.Info("Finish to subscribe redis.")
+}
+
+// healthCheck 健康检查
+func healthCheck(client *redis.Client) {
+	duration := time.Duration(time.Second * 5)
+	t := time.NewTicker(duration)
+	for {
+		<-t.C
+		if IsTerminated {
+			Logger.Info("IsTerminated, healthCheck exit.")
+			return
+		}
+		c := client.Publish(HealthCheckChannel, "HealthCheck")
+		_, err := c.Result()
+		if err != nil {
+			Logger.Error(err)
+			return
+		}
+	}
 }
 
 func main() {
@@ -71,11 +98,13 @@ func main() {
 	}
 	defer redisClient.Close()
 	Logger.Info("Start ...")
-	pubSub := redisClient.Subscribe("FOFO:REQUEST")
-	defer pubSub.Close()
 	signalChannel := make(chan bool)
-	cmdChannel := make(chan Command)
-	redisSubChannel := pubSub.Channel()
-	go subRedis(redisSubChannel, cmdChannel, signalChannel)
+	responseChannel := make(chan *entity.Response)
+	go subRedis(redisClient, signalChannel, responseChannel)
+	go response(redisClient, responseChannel)
+	// 每隔 5 秒广播一个健康检查的命令
+	go healthCheck(redisClient)
 	<-signalChannel
+	responseChannel <- nil
+	IsTerminated = true
 }
