@@ -7,15 +7,16 @@ env:
 
 install:
   - go mod download
+  - mkdir /etc/fofo
+  - cp config.toml /etc/fofo/
   - go build -o fofo -i .
-  - sudo chmod +x fofo
 
 services:
   - redis-server
   - mongodb
 
 script:
-  - ./fofo
+  - go test
 
 after_success:
   - codecov
