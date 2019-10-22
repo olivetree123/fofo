@@ -1,0 +1,21 @@
+language: golang
+golang:
+  - "1.13"
+
+env:
+  - GO111MODULE=on
+
+install:
+  - go mod download
+  - go build -o fofo -i .
+  - sudo chmod +x fofo
+
+services:
+  - redis-server
+  - mongodb
+
+script:
+  - ./fofo
+
+after_success:
+  - codecov
