@@ -7,8 +7,8 @@ env:
 
 install:
   - go mod download
-  - mkdir /etc/fofo
-  - cp config.toml /etc/fofo/
+  - sudo mkdir /etc/fofo
+  - sudo cp config.toml /etc/fofo/
   - go build -o fofo -i .
 
 services:
