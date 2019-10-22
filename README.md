@@ -1,4 +1,5 @@
 # Fofo
+[![Build Status](https://travis-ci.org/olivetree123/fofo.svg?branch=master)](https://travis-ci.org/olivetree123/fofo)
 Fofo is a service for Service Register & Discovery.
 
 ## Install
