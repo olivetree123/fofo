@@ -1,5 +1,5 @@
-language: golang
-golang:
+language: go
+go:
   - "1.13"
 
 env:
